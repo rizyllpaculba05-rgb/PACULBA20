@@ -507,7 +507,7 @@
         <div class="proj-num">02</div>
         <div class="proj-title">Scientific Calculator 🧮</div>
         <p class="proj-desc">A fully-functional scientific calculator with calculation history, built with the same cute pastel theme. Features trigonometric functions, logarithms, memory operations, and a beautiful animated interface.</p>
-        <a href="calculator.html" class="proj-link" target="_blank"><i class="fas fa-calculator"></i> Open Calculator ✨</a>
+        <a href="#" class="proj-link" onclick="openCalc();return false;"><i class="fas fa-calculator"></i> Open Calculator ✨</a>
         <div class="tags"><span class="tag">HTML5</span><span class="tag">CSS3</span><span class="tag">JavaScript</span><span class="tag">Math</span></div>
       </div>
     </div>
@@ -588,6 +588,380 @@ window.addEventListener('scroll',()=>{let c='';secs.forEach(s=>{if(scrollY>=s.of
 function showToast(m,err=false){let t=document.querySelector('.toast');if(!t){t=document.createElement('div');t.className='toast';document.body.appendChild(t);}t.textContent=m;t.style.borderColor=err?'rgba(251,113,133,.4)':'rgba(168,85,247,.3)';t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),3500);}
 // Form
 document.getElementById('contactForm').addEventListener('submit',async e=>{e.preventDefault();const btn=e.target.querySelector('.btn-send');const name=e.target.name.value.trim(),email=e.target.email.value.trim(),msg=e.target.message.value.trim();if(!name||!email||!msg){showToast('⚠️ Please fill in all fields!',true);return;}if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){showToast('⚠️ Invalid email!',true);return;}btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Sending... 🌸';await new Promise(r=>setTimeout(r,1400));btn.disabled=false;btn.innerHTML='<i class="fas fa-paper-plane"></i> Send Message 🌸';e.target.reset();showToast('💌 Message sent! I will get back to you soon ✨');});
+</script>
+
+<!-- ═══════════ CALCULATOR MODAL ═══════════ -->
+<style>
+  .calc-overlay{
+    position:fixed;inset:0;z-index:9000;
+    background:rgba(26,5,51,0.55);
+    backdrop-filter:blur(8px);
+    display:flex;align-items:center;justify-content:center;
+    opacity:0;pointer-events:none;
+    transition:opacity .35s var(--ease);
+    padding:1rem;
+  }
+  .calc-overlay.open{opacity:1;pointer-events:all;}
+  .calc-modal{
+    background:var(--bg);
+    border-radius:28px;
+    box-shadow:0 30px 80px rgba(168,85,247,.25),0 8px 30px rgba(0,0,0,.12);
+    max-width:700px;width:100%;
+    max-height:90vh;overflow-y:auto;
+    transform:scale(.92) translateY(30px);
+    transition:transform .4s var(--ease);
+    position:relative;
+  }
+  .calc-overlay.open .calc-modal{transform:scale(1) translateY(0);}
+
+  /* scrollbar */
+  .calc-modal::-webkit-scrollbar{width:4px;}
+  .calc-modal::-webkit-scrollbar-track{background:var(--bg2);}
+  .calc-modal::-webkit-scrollbar-thumb{background:var(--primary);border-radius:2px;}
+
+  .calc-modal-header{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:1.5rem 1.75rem 1rem;
+    border-bottom:1px solid var(--border);
+    position:sticky;top:0;background:var(--bg);z-index:10;
+    border-radius:28px 28px 0 0;
+  }
+  .calc-modal-title{
+    font-family:'Playfair Display',serif;font-size:1.4rem;font-weight:900;color:var(--ink);
+  }
+  .calc-modal-title em{
+    font-style:italic;
+    background:linear-gradient(135deg,var(--primary),var(--pink));
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  }
+  .calc-close{
+    width:36px;height:36px;border-radius:50%;border:none;
+    background:rgba(168,85,247,.1);color:var(--primary);
+    font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;
+    transition:all .2s;font-family:'Plus Jakarta Sans',sans-serif;
+  }
+  .calc-close:hover{background:var(--primary);color:#fff;transform:rotate(90deg);}
+
+  .calc-inner{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:1.25rem;
+    padding:1.25rem 1.75rem 1.75rem;
+  }
+
+  /* Display */
+  .c-display{
+    background:linear-gradient(135deg,#2d1252,#1a0533);
+    border-radius:20px;padding:1.25rem 1.25rem 1rem;
+    position:relative;overflow:hidden;
+  }
+  .c-display::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 80% 20%,rgba(168,85,247,.3),transparent 60%);pointer-events:none;}
+  .c-expr{font-size:.7rem;color:rgba(255,255,255,.4);min-height:1.1rem;text-align:right;margin-bottom:.25rem;word-break:break-all;}
+  .c-main{
+    font-family:'Playfair Display',serif;font-size:2.2rem;color:#fff;
+    text-align:right;word-break:break-all;line-height:1.1;position:relative;z-index:1;
+  }
+  .c-main.cpop{animation:cpop .15s ease-out;}
+  @keyframes cpop{0%{transform:scale(1)}50%{transform:scale(1.05)}100%{transform:scale(1)}}
+  .c-modes{display:flex;gap:.4rem;margin-top:.65rem;}
+  .c-mode{
+    padding:.22rem .6rem;border-radius:50px;font-size:.6rem;font-weight:700;
+    letter-spacing:.06em;text-transform:uppercase;cursor:pointer;border:none;
+    background:rgba(255,255,255,.1);color:rgba(255,255,255,.5);
+    transition:all .2s;font-family:'Plus Jakarta Sans',sans-serif;
+  }
+  .c-mode.active{background:var(--primary);color:#fff;}
+
+  /* Buttons */
+  .c-btns{
+    display:grid;grid-template-columns:repeat(5,1fr);gap:.45rem;margin-top:.9rem;
+  }
+  .cb{
+    aspect-ratio:1;border:none;border-radius:12px;
+    font-family:'Plus Jakarta Sans',sans-serif;font-size:.72rem;font-weight:700;
+    cursor:pointer;transition:all .15s var(--ease);
+    display:flex;align-items:center;justify-content:center;
+    position:relative;overflow:hidden;
+  }
+  .cb::after{content:'';position:absolute;inset:0;background:rgba(255,255,255,.25);opacity:0;border-radius:inherit;transition:opacity .15s;}
+  .cb:hover{transform:translateY(-3px) scale(1.07);}
+  .cb:hover::after{opacity:1;}
+  .cb:active{transform:scale(.93);}
+  .cb-n{background:var(--bg2);color:var(--ink);box-shadow:0 2px 6px rgba(0,0,0,.06);}
+  .cb-n:hover{background:#fff;box-shadow:0 6px 18px rgba(168,85,247,.15);}
+  .cb-o{background:linear-gradient(135deg,rgba(168,85,247,.15),rgba(244,114,182,.12));color:var(--p2);}
+  .cb-o:hover{background:linear-gradient(135deg,var(--primary),var(--pink));color:#fff;box-shadow:0 6px 18px rgba(168,85,247,.3);}
+  .cb-f{background:linear-gradient(135deg,rgba(168,85,247,.08),rgba(192,132,252,.1));color:var(--p2);font-size:.63rem;}
+  .cb-f:hover{background:linear-gradient(135deg,var(--p2),var(--primary));color:#fff;box-shadow:0 6px 18px rgba(124,58,237,.3);}
+  .cb-eq{
+    background:linear-gradient(135deg,var(--primary),var(--pink));color:#fff;
+    grid-column:span 2;aspect-ratio:auto;padding:.75rem;
+    font-size:.85rem;border-radius:12px;
+    box-shadow:0 6px 20px rgba(168,85,247,.4);
+  }
+  .cb-eq:hover{box-shadow:0 12px 32px rgba(168,85,247,.5);transform:translateY(-3px);}
+  .cb-cl{background:linear-gradient(135deg,#fecaca,#fca5a5);color:#991b1b;}
+  .cb-cl:hover{background:linear-gradient(135deg,#f87171,#ef4444);color:#fff;box-shadow:0 6px 18px rgba(239,68,68,.3);}
+  .cb-sp{background:linear-gradient(135deg,#fef3c7,#fde68a);color:#92400e;}
+  .cb-sp:hover{background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#fff;box-shadow:0 6px 18px rgba(251,191,36,.3);}
+  .cb-z{grid-column:span 2;aspect-ratio:auto;padding:.75rem;border-radius:12px;justify-content:flex-start;padding-left:1.1rem;}
+
+  /* History */
+  .c-history{
+    background:#fff;border:1.5px solid var(--border);border-radius:20px;
+    overflow:hidden;display:flex;flex-direction:column;max-height:520px;
+  }
+  .c-history::before{content:'';display:block;height:3px;background:linear-gradient(90deg,var(--pink),var(--peach),var(--yellow));flex-shrink:0;}
+  .c-hist-head{
+    padding:.9rem 1.1rem .7rem;display:flex;align-items:center;justify-content:space-between;
+    border-bottom:1px solid var(--border);flex-shrink:0;
+  }
+  .c-hist-title{font-family:'Playfair Display',serif;font-size:1rem;font-weight:700;color:var(--ink);}
+  .c-hist-clr{
+    padding:.25rem .65rem;border-radius:50px;font-size:.62rem;font-weight:700;
+    background:rgba(251,113,133,.1);color:var(--pink);cursor:pointer;border:none;
+    transition:all .2s;font-family:'Plus Jakarta Sans',sans-serif;
+  }
+  .c-hist-clr:hover{background:var(--pink);color:#fff;}
+  .c-hist-list{flex:1;overflow-y:auto;padding:.6rem;display:flex;flex-direction:column;gap:.5rem;}
+  .c-hist-list::-webkit-scrollbar{width:3px;}
+  .c-hist-list::-webkit-scrollbar-thumb{background:var(--primary);border-radius:2px;}
+  .c-hist-item{
+    background:var(--bg2);border:1.5px solid var(--border);border-radius:12px;
+    padding:.6rem .85rem;cursor:pointer;transition:all .25s var(--ease);
+    animation:cSlide .3s var(--ease);
+  }
+  @keyframes cSlide{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:translateX(0)}}
+  .c-hist-item:hover{background:#fff;border-color:rgba(168,85,247,.25);transform:translateX(-3px);box-shadow:0 4px 16px rgba(168,85,247,.1);}
+  .c-hi-expr{font-size:.68rem;color:var(--muted);margin-bottom:.15rem;word-break:break-all;}
+  .c-hi-res{font-family:'Playfair Display',serif;font-size:1.05rem;font-weight:700;color:var(--p2);}
+  .c-hi-time{font-size:.58rem;color:var(--faint);margin-top:.15rem;}
+  .c-hist-empty{
+    flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    color:var(--faint);text-align:center;padding:1.5rem;gap:.4rem;
+  }
+  .c-hist-empty .big{font-size:2rem;}
+  .c-hist-empty p{font-size:.75rem;}
+
+  @media(max-width:600px){
+    .calc-inner{grid-template-columns:1fr;}
+    .c-history{max-height:260px;}
+  }
+</style>
+
+<!-- Modal markup -->
+<div class="calc-overlay" id="calcOverlay" onclick="if(event.target===this)closeCalc()">
+  <div class="calc-modal">
+    <div class="calc-modal-header">
+      <div class="calc-modal-title">Scientific <em>Calculator</em> 🧮</div>
+      <button class="calc-close" onclick="closeCalc()">✕</button>
+    </div>
+    <div class="calc-inner">
+      <!-- Left: calculator -->
+      <div>
+        <div class="c-display">
+          <div class="c-expr" id="cExpr">&nbsp;</div>
+          <div class="c-main" id="cMain">0</div>
+          <div class="c-modes">
+            <button class="c-mode active" id="cDeg" onclick="cSetMode('deg')">DEG</button>
+            <button class="c-mode" id="cRad" onclick="cSetMode('rad')">RAD</button>
+          </div>
+        </div>
+        <div class="c-btns">
+          <!-- Row 1 -->
+          <button class="cb cb-f" onclick="cFn('sin(')">sin</button>
+          <button class="cb cb-f" onclick="cFn('cos(')">cos</button>
+          <button class="cb cb-f" onclick="cFn('tan(')">tan</button>
+          <button class="cb cb-f" onclick="cFn('log(')">log</button>
+          <button class="cb cb-f" onclick="cFn('ln(')">ln</button>
+          <!-- Row 2 -->
+          <button class="cb cb-f" onclick="cFn('asin(')">sin⁻¹</button>
+          <button class="cb cb-f" onclick="cFn('acos(')">cos⁻¹</button>
+          <button class="cb cb-f" onclick="cFn('atan(')">tan⁻¹</button>
+          <button class="cb cb-f" onclick="cFn('sqrt(')">√</button>
+          <button class="cb cb-f" onclick="cFn('^')">xʸ</button>
+          <!-- Row 3 -->
+          <button class="cb cb-f" onclick="cFn('pi')">π</button>
+          <button class="cb cb-f" onclick="cFn('e')">e</button>
+          <button class="cb cb-f" onclick="cFn('abs(')">|x|</button>
+          <button class="cb cb-f" onclick="cFn('(')">(</button>
+          <button class="cb cb-f" onclick="cFn(')')">)</button>
+          <!-- Row 4 -->
+          <button class="cb cb-cl" onclick="cClear()">AC</button>
+          <button class="cb cb-sp" onclick="cDel()">⌫</button>
+          <button class="cb cb-sp" onclick="cFn('%')">%</button>
+          <button class="cb cb-o" onclick="cOp('/')">÷</button>
+          <button class="cb cb-f" onclick="cFn('!')">n!</button>
+          <!-- Row 5 -->
+          <button class="cb cb-n" onclick="cNum('7')">7</button>
+          <button class="cb cb-n" onclick="cNum('8')">8</button>
+          <button class="cb cb-n" onclick="cNum('9')">9</button>
+          <button class="cb cb-o" onclick="cOp('*')">×</button>
+          <button class="cb cb-f" onclick="cFn('1/')">1/x</button>
+          <!-- Row 6 -->
+          <button class="cb cb-n" onclick="cNum('4')">4</button>
+          <button class="cb cb-n" onclick="cNum('5')">5</button>
+          <button class="cb cb-n" onclick="cNum('6')">6</button>
+          <button class="cb cb-o" onclick="cOp('-')">−</button>
+          <button class="cb cb-f" onclick="cFn('sqr(')">x²</button>
+          <!-- Row 7 -->
+          <button class="cb cb-n" onclick="cNum('1')">1</button>
+          <button class="cb cb-n" onclick="cNum('2')">2</button>
+          <button class="cb cb-n" onclick="cNum('3')">3</button>
+          <button class="cb cb-o" onclick="cOp('+')">+</button>
+          <button class="cb cb-f" onclick="cNeg()">±</button>
+          <!-- Row 8 -->
+          <button class="cb cb-n cb-z" onclick="cNum('0')">0</button>
+          <button class="cb cb-n" onclick="cDot()">.</button>
+          <button class="cb cb-eq" onclick="cCalc()">= ✨</button>
+        </div>
+      </div>
+
+      <!-- Right: history -->
+      <div class="c-history">
+        <div class="c-hist-head">
+          <div class="c-hist-title">📋 History</div>
+          <button class="c-hist-clr" onclick="cClearHist()">Clear all</button>
+        </div>
+        <div class="c-hist-list" id="cHistList">
+          <div class="c-hist-empty" id="cHistEmpty">
+            <div class="big">🧮</div>
+            <p>Calculations appear here!</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Modal open/close ──
+function openCalc(){
+  document.getElementById('calcOverlay').classList.add('open');
+  document.body.style.overflow='hidden';
+}
+function closeCalc(){
+  document.getElementById('calcOverlay').classList.remove('open');
+  document.body.style.overflow='';
+}
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeCalc(); });
+
+// ── Calculator state ──
+let cExprStr='', cIsDeg=true, cNewNum=true, cHist=[];
+const cMainEl=document.getElementById('cMain');
+const cExprEl=document.getElementById('cExpr');
+
+function cUpdate(v){
+  cMainEl.textContent=v||'0';
+  cMainEl.classList.remove('cpop');
+  void cMainEl.offsetWidth;
+  cMainEl.classList.add('cpop');
+}
+function cSetMode(m){
+  cIsDeg=(m==='deg');
+  document.getElementById('cDeg').classList.toggle('active',cIsDeg);
+  document.getElementById('cRad').classList.toggle('active',!cIsDeg);
+}
+function cNum(n){
+  if(cNewNum){cExprStr=n;cNewNum=false;}
+  else{cExprStr=cExprStr==='0'&&n!=='.'?n:cExprStr+n;}
+  cUpdate(cExprStr);cExprEl.innerHTML='&nbsp;';
+}
+function cDot(){
+  if(cNewNum){cExprStr='0.';cNewNum=false;}
+  else if(!cExprStr.includes('.')||/[+\-*\/\(]/.test(cExprStr.slice(-1))){cExprStr+='.';}
+  cUpdate(cExprStr);
+}
+function cOp(op){
+  cNewNum=false;
+  const last=cExprStr.slice(-1);
+  if(['+','-','*','/'].includes(last))cExprStr=cExprStr.slice(0,-1);
+  cExprStr+=op;cUpdate(cExprStr);
+}
+function cFn(fn){
+  if(fn==='pi'){cExprStr=(cNewNum||!cExprStr||cExprStr==='0')?'π':cExprStr+'×π';cNewNum=false;cUpdate(cExprStr);return;}
+  if(fn==='e'){cExprStr=(cNewNum||!cExprStr||cExprStr==='0')?'e':cExprStr+'×e';cNewNum=false;cUpdate(cExprStr);return;}
+  if(fn==='1/'){cExprStr='1÷('+cExprStr+')';cUpdate(cExprStr);return;}
+  if(fn==='sqr('){cExprStr=cExprStr+'²';cUpdate(cExprStr);return;}
+  if(fn==='!'){cExprStr=cExprStr+'!';cUpdate(cExprStr);return;}
+  cExprStr=cNewNum?fn:cExprStr+fn;
+  cNewNum=false;cUpdate(cExprStr);
+}
+function cNeg(){if(cExprStr&&cExprStr!=='0'){cExprStr=cExprStr.startsWith('-')?cExprStr.slice(1):'-'+cExprStr;cUpdate(cExprStr);}}
+function cDel(){if(cExprStr.length>1){cExprStr=cExprStr.slice(0,-1);}else{cExprStr='0';cNewNum=true;}cUpdate(cExprStr);}
+function cClear(){cExprStr='';cNewNum=true;cUpdate('0');cExprEl.innerHTML='&nbsp;';}
+
+function cFactorial(n){if(n<0||!Number.isInteger(n))return NaN;if(n<=1)return 1;let r=1;for(let i=2;i<=n;i++)r*=i;return r;}
+
+function cCalc(){
+  if(!cExprStr||cExprStr==='0')return;
+  const orig=cExprStr;
+  try{
+    let e=cExprStr
+      .replace(/π/g,'Math.PI')
+      .replace(/e(?![a-z])/g,'Math.E')
+      .replace(/×/g,'*').replace(/÷/g,'/')
+      .replace(/²/g,'**2').replace(/\^/g,'**')
+      .replace(/sin\(/g,cIsDeg?'Math.sin(Math.PI/180*':'Math.sin(')
+      .replace(/cos\(/g,cIsDeg?'Math.cos(Math.PI/180*':'Math.cos(')
+      .replace(/tan\(/g,cIsDeg?'Math.tan(Math.PI/180*':'Math.tan(')
+      .replace(/asin\(/g,cIsDeg?'(180/Math.PI*Math.asin(':'Math.asin(')
+      .replace(/acos\(/g,cIsDeg?'(180/Math.PI*Math.acos(':'Math.acos(')
+      .replace(/atan\(/g,cIsDeg?'(180/Math.PI*Math.atan(':'Math.atan(')
+      .replace(/log\(/g,'Math.log10(')
+      .replace(/ln\(/g,'Math.log(')
+      .replace(/sqrt\(/g,'Math.sqrt(')
+      .replace(/abs\(/g,'Math.abs(')
+      .replace(/1÷\(/g,'1/(')
+      .replace(/(\d+)!/g,(_,n)=>cFactorial(parseInt(n)))
+      .replace(/%/g,'/100');
+    const val=Function('"use strict";return('+e+')')();
+    if(typeof val!=='number'||isNaN(val)||!isFinite(val))throw new Error();
+    const fmt=parseFloat(val.toPrecision(12)).toString();
+    cExprEl.textContent=orig+' =';
+    cUpdate(fmt);
+    cAddHist(orig,fmt);
+    cExprStr=fmt;cNewNum=true;
+  }catch{
+    cExprEl.textContent=cExprStr;
+    cUpdate('Error 😅');
+    cExprStr='';cNewNum=true;
+  }
+}
+
+function cAddHist(e,r){
+  const t=new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+  cHist.unshift({e,r,t});
+  if(cHist.length>50)cHist.pop();
+  cRenderHist();
+}
+function cRenderHist(){
+  const list=document.getElementById('cHistList');
+  const empty=document.getElementById('cHistEmpty');
+  list.querySelectorAll('.c-hist-item').forEach(el=>el.remove());
+  if(cHist.length===0){empty.style.display='flex';return;}
+  empty.style.display='none';
+  cHist.forEach((h,i)=>{
+    const d=document.createElement('div');
+    d.className='c-hist-item';
+    d.innerHTML='<div class="c-hi-expr">'+h.e+'</div><div class="c-hi-res">= '+h.r+'</div><div class="c-hi-time">🕐 '+h.t+'</div>';
+    d.addEventListener('click',()=>{cExprStr=h.r;cUpdate(cExprStr);cExprEl.textContent=h.e+' =';cNewNum=true;});
+    list.insertBefore(d,empty);
+  });
+}
+function cClearHist(){cHist=[];cRenderHist();}
+
+// Keyboard — only active when modal is open
+document.addEventListener('keydown',e=>{
+  if(!document.getElementById('calcOverlay').classList.contains('open'))return;
+  if(e.key>='0'&&e.key<='9')cNum(e.key);
+  else if(e.key==='.')cDot();
+  else if(e.key==='+'||e.key==='-')cOp(e.key);
+  else if(e.key==='*')cOp('*');
+  else if(e.key==='/')e.preventDefault(),cOp('/');
+  else if(e.key==='Enter'||e.key==='=')cCalc();
+  else if(e.key==='Backspace')cDel();
+});
 </script>
 </body>
 </html>
